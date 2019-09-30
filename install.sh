@@ -207,21 +207,7 @@ if grep --quiet AMD /proc/cpuinfo; then
 fi
 
 echo Bootloader
-if [ -z "$detect_uefi" ]; then
-  pacstrap "$install_root" grub
-  (
-    IFS=,
-    for device in $bios_devices; do
-      arch-chroot "$install_root" grub-install --target=i386-pc "$device"
-    done
-  )
-else
-  pacstrap "$install_root" grub efibootmgr
-  arch-chroot "$install_root" grub-install \
-    --target=x86_64-efi \
-    --efi-directory="$efi_directory" \
-    --bootloader-id=GRUB
-fi
+pacstrap "$install_root" grub
 replace_lines \
   "$install_root/etc/default/grub" \
   '^GRUB_CMDLINE_LINUX_DEFAULT=".*"$' \
@@ -240,4 +226,20 @@ if [ ! -z "$grub_enable_cryptodisk" ]; then
     '^#GRUB_ENABLE_CRYPTODISK=y$' \
     'GRUB_ENABLE_CRYPTODISK=y'
 fi
+if [ -z "$detect_uefi" ]; then
+  (
+    IFS=,
+    for device in $bios_devices; do
+      arch-chroot "$install_root" grub-install --target=i386-pc "$device"
+    done
+  )
+else
+  pacstrap "$install_root" efibootmgr
+  arch-chroot "$install_root" grub-install \
+    --target=x86_64-efi \
+    --efi-directory="$efi_directory" \
+    --bootloader-id=GRUB
+fi
 arch-chroot "$install_root" grub-mkconfig -o /boot/grub/grub.cfg
+
+chmod --recursive 0600 "$install_root/boot"

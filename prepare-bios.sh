@@ -68,8 +68,11 @@ partition_device /dev/sda
 mount_filesystem /dev/sda3 "$install_root/" ext4 -F
 mount_filesystem /dev/sda2 "$install_root$boot_directory" vfat -F 32
 
+genfstab -U "$install_root" >>"./fstab"
+
 cat >./env.sh <<EOF
 export FAI_INSTALL_ROOT='$install_root'
+export FAI_INSTALL_CONFIGURATION_FILES='./fstab:$install_root/etc/fstab'
 export FAI_BOOTLDR_BIOS_DEVICES='/dev/sda'
 export FAI_BOOTLDR_PRELOAD_MODULES='part_gpt'
 EOF

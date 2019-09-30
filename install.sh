@@ -4,6 +4,9 @@ set -xeuo pipefail
 # Arguments
 #
 # Required
+#   FAI_INSTALL_CONFIGURATION_FILES
+#     Comma-delimited list of file copy specifications. Each specification is a
+#     source and destination file path, separate by a `:` character.
 #   FAI_SYSTEMD_ROOT_PASSWORD
 #     Password for root user.
 #   FAI_BOOTLDR_BIOS_DEVICES
@@ -51,6 +54,7 @@ if [ -d /sys/firmware/efi/efivars ]; then
 fi
 
 install_root="${FAI_INSTALL_ROOT:-/mnt/arch}"
+configuration_files="$FAI_INSTALL_CONFIGURATION_FILES"
 locale="${FAI_SYSTEMD_LOCALE:-"$LANG"}"
 keymap="${FAI_SYSTEMD_KEYMAP:-}"
 timezone="${FAI_SYSTEMD_TIMEZONE:-}"
@@ -81,6 +85,16 @@ function ensure_file() {
 
   mkdir --parents "$(dirname "$file")"
   touch "$file"
+}
+
+function copy_file() {
+  local source destination
+  source="$1"
+  destination="$2"
+  readonly source destination
+
+  mkdir --parents "$(dirname "$destination")"
+  cp --dereference --force "$source" "$destination"
 }
 
 function populate_file() {
@@ -120,8 +134,15 @@ timedatectl set-ntp true
 echo Install base system
 pacstrap "$install_root" base
 
-echo Fstab
-genfstab -U "$install_root" >>"$install_root/etc/fstab"
+echo Copy configuration files
+(
+  IFS=,
+  for source_and_destination in $configuration_files; do
+    copy_file \
+      "$(echo "$source_and_destination" | awk -F: '{print $1}')" \
+      "$(echo "$source_and_destination" | awk -F: '{print $2}')"
+  done
+)
 
 echo Configure systemd
 systemd_firstboot_args=

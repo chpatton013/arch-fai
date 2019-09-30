@@ -31,6 +31,9 @@ set -xeuo pipefail
 #   FAI_SYSTEMD_MACHINE_ID
 #     System machine id
 #     Default determined by running `systemd-firstboot`.
+#   FAI_BOOTLDR_MKINITCPIO_FILES
+#     Space-delimited list of files to include in initramfs.
+#     Default: ''
 #   FAI_BOOTLDR_EFI_DIRECTORY
 #     Default: '/efi'
 #     Note: Only used on a UEFI system
@@ -61,6 +64,7 @@ timezone="${FAI_SYSTEMD_TIMEZONE:-}"
 hostname="${FAI_SYSTEMD_HOSTNAME:-arch}"
 machine_id="${FAI_SYSTEMD_MACHINE_ID:-}"
 root_password="$FAI_SYSTEMD_ROOT_PASSWORD"
+mkinitcpio_files="${FAI_BOOTLDR_MKINITCPIO_FILES:-}"
 if [ -z "$detect_uefi" ]; then
   bios_devices="$FAI_BOOTLDR_BIOS_DEVICES"
 else
@@ -115,7 +119,7 @@ function replace_lines() {
   readonly file search replace
 
   ensure_file "$file"
-  sed --expression="s/$search/$replace/g" --in-place "$file"
+  sed --expression="s@$search@$replace@g" --in-place "$file"
 }
 
 function link_file() {
@@ -192,6 +196,10 @@ populate_file "$install_root/etc/hostname" "$hostname"
 populate_file "$install_root/etc/hosts" "$hosts"
 
 echo Initramfs
+replace_lines \
+  "$install_root/etc/mkinitcpio.conf" \
+  '^FILES=(.*)$' \
+  "FILES=($mkinitcpio_files)"
 replace_lines \
   "$install_root/etc/mkinitcpio.conf" \
   '^HOOKS=(.*)$' \

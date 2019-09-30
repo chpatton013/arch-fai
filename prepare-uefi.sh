@@ -2,6 +2,7 @@
 set -xeuo pipefail
 
 install_root=/mnt/arch
+efi_directory=/efi
 
 function parted_command() {
   parted --script --align=optimal -- "$@"
@@ -38,23 +39,37 @@ function parted_mkpart() {
     $flag_args
 }
 
-function mount_partition() {
-  local device mountpoint
+function partition_device() {
+  local device
+  device="$1"
+  readonly device
+
+  parted_mklabel "$device" gpt
+  parted_mkpart "$device" 1 primary grub 1 3 bios_grub
+  parted_mkpart "$device" 2 primary boot 3 131 boot
+  parted_mkpart "$device" 3 primary root 131 -1
+}
+
+function mount_filesystem() {
+  local device mountpoint type
   device="$1"
   mountpoint="$2"
-  readonly device mountpoint
+  type="$3"
+  readonly device mountpoint type
+  shift 3
 
+  mkfs --type="$type" "$@" "$device"
   mkdir --parents "$mountpoint"
   mount "$device" "$mountpoint"
 }
 
-parted_mklabel /dev/sda gpt
-parted_mkpart /dev/sda 1 primary grub 1 3 bios_grub
-parted_mkpart /dev/sda 2 primary esp 3 131 esp
-parted_mkpart /dev/sda 3 primary root 131 -1
+partition_device /dev/sda
 
-mkfs --type=vfat -F 32 /dev/sda2
-mkfs --type=ext4 -F /dev/sda3
+mount_filesystem /dev/sda3 "$install_root/" ext4 -F
+mount_filesystem /dev/sda2 "$install_root$efi_directory" vfat -F 32
 
-mount_partition /dev/sda3 "$install_root/"
-mount_partition /dev/sda2 "$install_root/efi"
+cat >./env.sh <<EOF
+export FAI_INSTALL_ROOT='$install_root'
+export FAI_BOOTLDR_EFI_DIRECTORY='$efi_directory'
+export FAI_BOOTLDR_PRELOAD_MODULES='part_gpt'
+EOF

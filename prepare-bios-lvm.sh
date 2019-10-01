@@ -1,6 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Prepare destination media prior to install.
+#
+# Arguments
+#   FAI_PREPARE_ROOT_CRYPT_PASPHRASE
+#     Passphrase to unlock the encrypted root volume at boot time.
+#
+# This script will format the destination media with a volume layout that looks
+# like the following diagram:
+#
+# /dev/sd{a,b}
+#   \_ partition 1: 2MB, flag=bios_grub
+#   \_ partition 2: 128MB, flag=boot
+#       \_ raid volume /dev/md/boot: level 1, metadata 1.0
+#           \_ fs: type vfat, mountpoint /boot
+#   \_ partition 3: 100%
+#       \_ raid volume /dev/md/root: level 0, metadata 1.2
+#           \_ crypt volume /dev/mapper/cryptroot: type luks2, keyfile /root/keys/cryptroot.bin
+#               \_ fs: type ext4, mountpoint /
+#
+# Create the following files (necessary for the subsequent install phase):
+# * mdadm.conf
+# * fstab
+# * crypttab
+# * env.sh
+#
+# After running this, source `env.sh`, set any other required environment
+# variables, and invoke `install.sh`.
+
 install_root=/mnt/arch
 keystore_directory=/tmp/keystore
 boot_directory=/boot

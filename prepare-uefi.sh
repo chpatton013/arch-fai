@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Prepare destination media prior to install.
+#
+# This script will format the destination media with a volume layout that looks
+# like the following diagram:
+#
+# /dev/sda
+#   \_ partition 1: 2MB, flag=bios_grub
+#   \_ partition 2: 128MB, flag=boot
+#       \_ fs: type vfat, mountpoint /efi
+#   \_ partition 3: 100%
+#       \_ fs: type ext4, mountpoint /
+#
+# Create the following files (necessary for the subsequent install phase):
+# * fstab
+# * env.sh
+#
+# After running this, source `env.sh`, set any other required environment
+# variables, and invoke `install.sh`.
+
 install_root=/mnt/arch
 efi_directory=/efi
 

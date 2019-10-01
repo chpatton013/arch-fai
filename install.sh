@@ -255,8 +255,9 @@ else
   pacstrap "$install_root" efibootmgr
   arch-chroot "$install_root" grub-install \
     --target=x86_64-efi \
+    --bootloader-id=GRUB \
     --efi-directory="$efi_directory" \
-    --bootloader-id=GRUB
+    --no-nvram
 fi
 arch-chroot "$install_root" grub-mkconfig -o /boot/grub/grub.cfg
 

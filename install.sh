@@ -34,6 +34,9 @@ set -xeuo pipefail
 #   FAI_BOOTLDR_MKINITCPIO_FILES
 #     Space-delimited list of files to include in initramfs.
 #     Default: ''
+#   FAI_BOOTLDR_MKINITCPIO_HOOKS
+#     Space-delimited list of hooks to include in initramfs.
+#     Default: ''
 #   FAI_BOOTLDR_EFI_DIRECTORY
 #     Default: '/efi'
 #     Note: Only used on a UEFI system
@@ -65,6 +68,7 @@ hostname="${FAI_SYSTEMD_HOSTNAME:-arch}"
 machine_id="${FAI_SYSTEMD_MACHINE_ID:-}"
 root_password="$FAI_SYSTEMD_ROOT_PASSWORD"
 mkinitcpio_files="${FAI_BOOTLDR_MKINITCPIO_FILES:-}"
+mkinitcpio_hooks="${FAI_BOOTLDR_MKINITCPIO_HOOKS:-}"
 if [ -z "$detect_uefi" ]; then
   bios_devices="$FAI_BOOTLDR_BIOS_DEVICES"
 else
@@ -195,16 +199,22 @@ EOF
 populate_file "$install_root/etc/hostname" "$hostname"
 populate_file "$install_root/etc/hosts" "$hosts"
 
-echo Initramfs
-replace_lines \
-  "$install_root/etc/mkinitcpio.conf" \
-  '^FILES=(.*)$' \
-  "FILES=($mkinitcpio_files)"
-replace_lines \
-  "$install_root/etc/mkinitcpio.conf" \
-  '^HOOKS=(.*)$' \
-  'HOOKS=(base udev autodetect keyboard keymap consolefont modconf block lvm2 mdadm_udev encrypt filesystems fsck)'
-arch-chroot "$install_root" mkinitcpio -p linux
+if [ ! -z "$mkinitcpio_files" ] || [ ! -z "$mkinitcpio_hooks" ]; then
+  echo Initramfs
+  if [ ! -z "$mkinitcpio_files" ]; then
+    replace_lines \
+      "$install_root/etc/mkinitcpio.conf" \
+      '^FILES=(.*)$' \
+      "FILES=($mkinitcpio_files)"
+  fi
+  if [ ! -z "$mkinitcpio_hooks" ]; then
+    replace_lines \
+      "$install_root/etc/mkinitcpio.conf" \
+      '^HOOKS=(.*)$' \
+      "HOOKS=($mkinitcpio_hooks)"
+  fi
+  arch-chroot "$install_root" mkinitcpio -p linux
+fi
 
 echo Microcode
 if grep --quiet Intel /proc/cpuinfo; then

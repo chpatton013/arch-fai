@@ -1,23 +1,47 @@
 #!/usr/bin/env bash
-set -xeuo pipefail
+set -euo pipefail
 
 install_root=/mnt/arch
 boot_directory=/boot
 
-function parted_command() {
-  parted --script --align=optimal -- "$@"
+function _mkdir() {
+  (
+    set -x
+    mkdir --parents "$@"
+  )
 }
 
-function parted_mklabel() {
+function _mkfs() {
+  (
+    set -x
+    mkfs "$@"
+  )
+}
+
+function _mount() {
+  (
+    set -x
+    mount "$@"
+  )
+}
+
+function _parted() {
+  (
+    set -x
+    parted --script --align=optimal -- "$@"
+  )
+}
+
+function _parted_mklabel() {
   local device label
   device="$1"
   label="$2"
   readonly device label
 
-  parted_command "$device" mklabel "$label"
+  _parted "$device" mklabel "$label"
 }
 
-function parted_mkpart() {
+function _parted_mkpart() {
   local device partition_number partition_type begin end name
   device="$1"
   partition_number="$2"
@@ -33,7 +57,7 @@ function parted_mkpart() {
     flag_args+=" set $partition_number $flag on"
   done
 
-  parted_command "$device" \
+  _parted "$device" \
     unit mib mkpart "$partition_type" "$begin" "$end" \
     name "$partition_number" "$name" \
     $flag_args
@@ -44,10 +68,10 @@ function partition_device() {
   device="$1"
   readonly device
 
-  parted_mklabel "$device" gpt
-  parted_mkpart "$device" 1 primary grub 1 3 bios_grub
-  parted_mkpart "$device" 2 primary boot 3 131 boot
-  parted_mkpart "$device" 3 primary root 131 -1
+  _parted_mklabel "$device" gpt
+  _parted_mkpart "$device" 1 primary grub 1 3 bios_grub
+  _parted_mkpart "$device" 2 primary boot 3 131 boot
+  _parted_mkpart "$device" 3 primary root 131 -1
 }
 
 function mount_filesystem() {
@@ -58,9 +82,9 @@ function mount_filesystem() {
   readonly device mountpoint type
   shift 3
 
-  mkfs --type="$type" "$@" "$device"
-  mkdir --parents "$mountpoint"
-  mount "$device" "$mountpoint"
+  _mkfs --type="$type" "$@" "$device"
+  _mkdir "$mountpoint"
+  _mount "$device" "$mountpoint"
 }
 
 partition_device /dev/sda
@@ -68,11 +92,13 @@ partition_device /dev/sda
 mount_filesystem /dev/sda3 "$install_root/" ext4 -F
 mount_filesystem /dev/sda2 "$install_root$boot_directory" vfat -F 32
 
-genfstab -U "$install_root" >>"./fstab"
+(
+  genfstab -U "$install_root" >>./fstab
 
-cat >./env.sh <<EOF
+  cat >./env.sh <<EOF
 export FAI_INSTALL_ROOT='$install_root'
 export FAI_INSTALL_CONFIGURATION_FILES='./fstab:$install_root/etc/fstab'
 export FAI_BOOTLDR_BIOS_DEVICES='/dev/sda'
 export FAI_BOOTLDR_PRELOAD_MODULES='part_gpt'
 EOF
+)
